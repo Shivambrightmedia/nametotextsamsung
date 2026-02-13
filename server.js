@@ -148,47 +148,60 @@ app.get('/api/text-to-png', async (req, res) => {
         else if (lang === 'ar') fontFamily = 'Noto Sans Arabic';
         else if (lang === 'ko') fontFamily = 'Noto Sans KR';
 
-        const padding = size;
+        // Render to canvas
+        const FIXED_WIDTH = 240;
+        const FIXED_HEIGHT = 60;
+        const WIDTH_PADDING = 20;
 
-        // Create a temporary canvas to measure text
+        // Auto-fit logic: Start with a logical max size and reduce
+        let fontSize = Math.min(parseInt(fontSizeParam, 10) || 40, FIXED_HEIGHT * 0.8);
+        const MIN_FONT_SIZE = 10;
+
         const measureCanvas = createCanvas(1, 1);
         const measureCtx = measureCanvas.getContext('2d');
-        measureCtx.font = `${size}px "${fontFamily}"`;
-
-        // Handle multi-line text
         const lines = transliteratedText.split('\n');
-        let maxWidth = 0;
-        lines.forEach(line => {
-            const metrics = measureCtx.measureText(line);
-            if (metrics.width > maxWidth) {
-                maxWidth = metrics.width;
+
+        // Loop to find largest font size
+        while (fontSize > MIN_FONT_SIZE) {
+            measureCtx.font = `${fontSize}px "${fontFamily}"`;
+
+            let maxWidth = 0;
+            lines.forEach(line => {
+                const metrics = measureCtx.measureText(line);
+                const w = metrics.actualBoundingBoxLeft !== undefined
+                    ? metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight
+                    : metrics.width;
+                if (w > maxWidth) maxWidth = w;
+            });
+
+            const totalHeight = lines.length * (fontSize * 1.2);
+            if (maxWidth <= (FIXED_WIDTH - WIDTH_PADDING) && totalHeight <= (FIXED_HEIGHT - 5)) {
+                break;
             }
-        });
-
-        const lineHeight = size * 1.2;
-        const widthBuffer = size * 0.5; // Extra buffer for complex scripts
-        const canvasWidth = Math.ceil(maxWidth + (padding * 2) + widthBuffer);
-        const canvasHeight = Math.ceil((lines.length * lineHeight) + (padding * 2));
-
-        // Create the actual canvas
-        const canvas = createCanvas(canvasWidth, canvasHeight);
-        const ctx = canvas.getContext('2d');
-
-        // Draw background
-        if (!isTransparent) {
-            ctx.fillStyle = `#${bg}`;
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            fontSize -= 2;
         }
 
-        // Draw text
-        ctx.font = `${size}px "${fontFamily}"`;
-        ctx.fillStyle = `#${color}`;
-        ctx.textBaseline = 'top';
+        const lineHeight = fontSize * 1.2;
 
-        let y = padding;
-        lines.forEach(line => {
-            ctx.fillText(line, padding, y);
-            y += lineHeight;
+        // Create Fixed Canvas
+        const canvas = createCanvas(FIXED_WIDTH, FIXED_HEIGHT);
+        const ctx = canvas.getContext('2d');
+
+        if (!isTransparent) {
+            ctx.fillStyle = `#${bg}`;
+            ctx.fillRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
+        }
+
+        ctx.font = `${fontSize}px "${fontFamily}"`;
+        ctx.fillStyle = `#${color}`;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+
+        const totalTextHeight = lines.length * lineHeight;
+        const startY = (FIXED_HEIGHT - totalTextHeight) / 2 + (lineHeight / 2);
+
+        lines.forEach((line, index) => {
+            ctx.fillText(line, FIXED_WIDTH / 2, startY + (index * lineHeight) - (lineHeight * 0.1));
         });
 
         // Step 3: Return PNG
