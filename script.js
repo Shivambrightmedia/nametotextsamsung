@@ -19,71 +19,77 @@ document.addEventListener('DOMContentLoaded', () => {
     // Separate variable for canvas display text (transliterated text goes here)
     let canvasText = '';
 
+    // Fixed canvas dimensions
+    const FIXED_WIDTH = 240;
+    const FIXED_HEIGHT = 60;
+
     // Default canvas setup
     function draw() {
         const text = canvasText || textInput.value || 'Type something...';
-        const size = parseInt(fontSize.value, 10);
         const font = fontFamily.value;
         const color = textColor.value;
         const bg = bgColor.value;
         const isTransparent = transparentBg.checked;
-        const padding = size; // Padding relative to font size
 
-        // Setup font for measuring
-        ctx.font = `${size}px ${font}`;
-
-        // Handle multi-line text
         const lines = text.split('\n');
-        let maxWidth = 0;
+        const WIDTH_PADDING = 20;
+        const MIN_FONT_SIZE = 10;
 
-        lines.forEach(line => {
-            const metrics = ctx.measureText(line);
-            // Use actualBoundingBoxLeft + actualBoundingBoxRight for accurate width
-            const actualWidth = metrics.actualBoundingBoxLeft !== undefined
-                ? metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight
-                : metrics.width;
-            if (actualWidth > maxWidth) {
-                maxWidth = actualWidth;
+        // Start with the user-selected font size, but cap at what fits the height
+        let size = Math.min(parseInt(fontSize.value, 10) || 40, 48);
+
+        // Auto-fit: reduce font size until text fits within 240x60
+        while (size > MIN_FONT_SIZE) {
+            ctx.font = `${size}px ${font}`;
+
+            let maxWidth = 0;
+            lines.forEach(line => {
+                const metrics = ctx.measureText(line);
+                const w = metrics.actualBoundingBoxLeft !== undefined
+                    ? metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight
+                    : metrics.width;
+                if (w > maxWidth) maxWidth = w;
+            });
+
+            const totalHeight = lines.length * (size * 1.2);
+
+            if (maxWidth <= (FIXED_WIDTH - WIDTH_PADDING) && totalHeight <= (FIXED_HEIGHT - 5)) {
+                break;
             }
-        });
 
-        // Calculate dimensions
-        // Approximate line height as 1.2 * size
+            size -= 2;
+        }
+
         const lineHeight = size * 1.2;
-        // Add extra 20% width buffer for complex scripts (Hindi, Gujarati, Arabic, Korean)
-        const widthBuffer = size * 0.5;
-        const totalHeight = (lines.length * lineHeight) + (padding * 2);
-        const totalWidth = maxWidth + (padding * 2) + widthBuffer;
 
-        // Update canvas size
-        canvas.width = totalWidth;
-        canvas.height = totalHeight;
+        // Set fixed canvas size
+        canvas.width = FIXED_WIDTH;
+        canvas.height = FIXED_HEIGHT;
 
         // Re-apply context settings after resize
         ctx.font = `${size}px ${font}`;
-        ctx.textBaseline = 'top';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
 
         // Draw Background
         if (!isTransparent) {
             ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
         } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
         }
 
-        // Draw Text
+        // Draw Centered Text
         ctx.fillStyle = color;
-        let y = padding;
+        const totalTextHeight = lines.length * lineHeight;
+        const startY = (FIXED_HEIGHT - totalTextHeight) / 2 + (lineHeight / 2);
 
-        lines.forEach(line => {
-            // Center text? Let's align left with padding for now, maybe add alignment later.
-            // For now, left aligned at padding.
-            ctx.fillText(line, padding, y);
-            y += lineHeight;
+        lines.forEach((line, index) => {
+            ctx.fillText(line, FIXED_WIDTH / 2, startY + (index * lineHeight) - (lineHeight * 0.1));
         });
 
         // Update status
-        statusSpan.textContent = `${Math.round(canvas.width)} x ${Math.round(canvas.height)} px`;
+        statusSpan.textContent = `${FIXED_WIDTH} × ${FIXED_HEIGHT} px`;
     }
 
     // Event Listeners
