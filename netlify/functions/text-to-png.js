@@ -1,42 +1,49 @@
 const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 const fetch = require('node-fetch');
-const stream = require('stream');
-const { promisify } = require('util');
-const pipeline = promisify(stream.pipeline);
 
-// Font Configuration (CDN URLs)
-const FONT_MAP = {
-    'hi': { family: 'Noto Sans Devanagari', url: 'https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Bold.ttf' },
-    'mr': { family: 'Noto Sans Devanagari', url: 'https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Bold.ttf' },
-    'gu': { family: 'Noto Sans Gujarati', url: 'https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Bold.ttf' },
-    'ar': { family: 'Noto Sans Arabic', url: 'https://github.com/google/fonts/raw/main/ofl/notosansarabic/NotoSansArabic-Bold.ttf' },
-    'ko': { family: 'Noto Sans KR', url: 'https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf' },
-    'en': { family: 'Samsung Sharp Sans', url: null } // English uses local or fallback
+// Register Fonts
+const fonts = {
+    'Samsung Sharp Sans': 'samsungsharpsans-medium.otf',
+    'Global Font': 'global.ttf'
 };
 
-// Helper: Download file if not exists
-async function downloadFont(url, filename) {
-    const tmpPath = path.join('/tmp', filename);
+// Tracking font loading status for debug
+const fontDebug = {
+    attempts: [],
+    loaded: []
+};
 
-    if (fs.existsSync(tmpPath)) {
-        return tmpPath; // Already downloaded (warm cache)
+Object.entries(fonts).forEach(([family, file]) => {
+    // Possible paths where Netlify/AWS Lambda might put files
+    const pathsToCheck = [
+        path.join(__dirname, 'fonts', file),                     // Bundled relative
+        path.join(process.cwd(), 'fonts', file),                 // Root based
+        path.join(__dirname, '..', '..', 'fonts', file),         // Local dev
+        path.resolve(file)                                       // Root fallback
+    ];
+
+    for (const p of pathsToCheck) {
+        if (fs.existsSync(p)) {
+            try {
+                GlobalFonts.registerFromPath(p, family);
+                fontDebug.loaded.push(`${family} from ${p}`);
+                break; // Stop once registered
+            } catch (e) {
+                fontDebug.attempts.push(`Failed ${p}: ${e.message}`);
+            }
+        } else {
+            fontDebug.attempts.push(`Missing ${p}`);
+        }
     }
+});
 
-    console.log(`Downloading font from ${url}...`);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch font: ${response.statusText}`);
-
-    await pipeline(response.body, fs.createWriteStream(tmpPath));
-    console.log(`Font saved to ${tmpPath}`);
-    return tmpPath;
-}
-
-// Helper: Transliterate
+// Transliterate function
 async function transliterate(text, targetLang) {
     if (targetLang === 'en') return text;
 
+    // Strategy 1: Google Translate
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
         const response = await fetch(url);
@@ -47,6 +54,7 @@ async function transliterate(text, targetLang) {
         }
     } catch (e) { }
 
+    // Strategy 2: Sentence method
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(`My name is ${text}`)}`;
         const response = await fetch(url);
@@ -54,60 +62,63 @@ async function transliterate(text, targetLang) {
         if (data && data[0] && data[0][0]) return data[0][0][0].split(/\s+/).pop();
     } catch (e) { }
 
+    // Strategy 3: MyMemory
+    try {
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.responseStatus === 200 && data.responseData.translatedText) {
+            return data.responseData.translatedText;
+        }
+    } catch (e) { }
+
     return text;
 }
 
 exports.handler = async (event) => {
     const params = event.queryStringParameters || {};
-    const { text, lang = 'en', fontSize = '64', color = 'ffffff', bg = '000000', transparent = 'false' } = params;
+    const {
+        text,
+        lang = 'en',
+        fontSize: fontSizeParam = '64',
+        color = 'ffffff',
+        bg = '000000',
+        transparent = 'false'
+    } = params;
 
-    const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    };
 
-    if (!text) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing text' }) };
+    if (!text) {
+        return {
+            statusCode: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Missing required parameter: text' })
+        };
+    }
 
     try {
-        const size = parseInt(fontSize, 10) || 64;
         const isTransparent = transparent === 'true';
 
-        // 1. Transliterate
+        // Transliterate
         const transliteratedText = await transliterate(text, lang);
 
-        // 2. Determine Font
+        // Select Font
         let fontFamily = 'Samsung Sharp Sans';
-        let fontFile = 'samsungsharpsans-medium.otf';
-
-        // Check if we need to download a specific font
-        if (FONT_MAP[lang]) {
-            const config = FONT_MAP[lang];
-            if (config.url) {
-                // Download and register matching font
-                const filename = path.basename(config.url);
-                try {
-                    const fontPath = await downloadFont(config.url, filename);
-                    GlobalFonts.registerFromPath(fontPath, config.family);
-                    fontFamily = config.family;
-                } catch (err) {
-                    console.error('Font download failed:', err);
-                    // Fallback to Samsung, likely resulting in boxes, but better than crash
-                }
-            }
+        if (lang !== 'en') {
+            fontFamily = 'Global Font';
         }
 
-        // Register default Samsung font (try bundling path, then tmp if we ever downloaded it)
-        try {
-            // Try standard paths for bundled font
-            const localPath = path.join(__dirname, 'fonts', 'samsungsharpsans-medium.otf');
-            if (fs.existsSync(localPath)) GlobalFonts.registerFromPath(localPath, 'Samsung Sharp Sans');
-        } catch (e) { }
-
-        // 3. Setup Canvas
         // Fixed Canvas Dimensions
         const FIXED_WIDTH = 240;
         const FIXED_HEIGHT = 60;
         const WIDTH_PADDING = 20;
 
-        // Auto-fit logic: Start with a logical max size and reduce until it fits
-        let fontSize = Math.min(parseInt(fontSizeParam, 10) || 40, FIXED_HEIGHT * 0.8);
+        // Auto-fit logic
+        // Parse requested size, but cap it at 48px to fit height
+        let fontSize = Math.min(parseInt(fontSizeParam, 10) || 40, 48);
         const MIN_FONT_SIZE = 10;
 
         const measureCanvas = createCanvas(1, 1);
@@ -127,6 +138,7 @@ exports.handler = async (event) => {
                 if (w > maxWidth) maxWidth = w;
             });
 
+            // Height check (approximate)
             const totalHeight = lines.length * (fontSize * 1.2);
 
             // Check if it fits within safe area
@@ -161,25 +173,30 @@ exports.handler = async (event) => {
             ctx.fillText(line, FIXED_WIDTH / 2, startY + (index * lineHeight) - (lineHeight * 0.1));
         });
 
+        const buffer = canvas.toBuffer('image/png');
+
         return {
             statusCode: 200,
             headers: {
                 ...headers,
                 'Content-Type': 'image/png',
+                'Content-Disposition': `inline; filename="${text}-${lang}.png"`,
                 'X-Original-Text': text,
                 'X-Transliterated-Text': encodeURIComponent(transliteratedText),
-                'X-Font-Used': fontFamily
+                'X-Language': lang,
+                'X-Font-Used': fontFamily,
+                'X-Debug-Fonts': JSON.stringify(fontDebug.loaded)
             },
-            body: canvas.toBuffer('image/png').toString('base64'),
+            body: buffer.toString('base64'),
             isBase64Encoded: true
         };
 
     } catch (error) {
-        console.error(error);
+        console.error('Error:', error);
         return {
             statusCode: 500,
-            headers,
-            body: JSON.stringify({ error: error.message })
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Failed to generate image', details: error.message })
         };
     }
 };
