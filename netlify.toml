@@ -1,0 +1,25 @@
+[build]
+  # No build step needed for this simple project
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  # Include node_modules in functions
+  node_bundler = "esbuild"
+  included_files = ["fonts/*.otf", "fonts/*.ttf"]
+
+# Redirect API calls to the serverless function
+[[redirects]]
+  from = "/api/text-to-png"
+  to = "/.netlify/functions/text-to-png"
+  status = 200
+
+[[redirects]]
+  from = "/api/transliterate"
+  to = "/.netlify/functions/transliterate"
+  status = 200
+
+[[redirects]]
+  from = "/api"
+  to = "/.netlify/functions/api-docs"
+  status = 200

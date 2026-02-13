@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to PNG Converter - Premium Edition</title>
+    <meta name="description"
+        content="Convert text to high-quality PNG images with Samsung Sharp Sans and multilingual support.">
+    <!-- Google Fonts for Fallbacks and UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+TC:wght@400;700&family=Noto+Sans+Arabic:wght@400;700&family=Noto+Sans+Hebrew:wght@400;700&family=Noto+Sans+Thai:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Text to PNG <span class="highlight">Studio</span></h1>
+            <p>Create stunning text images in any language.</p>
+        </header>
+
+        <main class="editor-layout">
+            <aside class="controls-panel">
+                <div class="control-group">
+                    <label for="textInput">Enter Name (English)</label>
+                    <textarea id="textInput" placeholder="Type a name... e.g. Avinash"></textarea>
+
+                    <div class="translation-controls">
+                        <select id="targetLanguage">
+                            <option value="en">English</option>
+                            <option value="ko">Korean (한국어)</option>
+                            <option value="hi">Hindi (हिंदी)</option>
+                            <option value="mr">Marathi (मराठी)</option>
+                            <option value="gu">Gujarati (ગુજરાતી)</option>
+                            <option value="ar">Arabic (العربية)</option>
+                        </select>
+                        <button id="translateBtn" class="secondary-btn">
+                            🔤 Transliterate
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Typography</label>
+                    <div class="font-selector">
+                        <select id="fontFamily">
+                            <option
+                                value="'Samsung Sharp Sans', 'Inter', 'Noto Sans', 'Noto Sans KR', 'Noto Sans JP', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans Arabic', 'Noto Sans Hebrew', 'Noto Sans Thai', 'Noto Sans Devanagari', sans-serif">
+                                Samsung Sharp Sans + Global</option>
+                            <option value="'Inter', sans-serif">Inter (Modern)</option>
+                            <option value="'Noto Sans', sans-serif">Noto Sans (Global)</option>
+                            <option value="serif">Serif</option>
+                            <option value="cursive">Cursive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-row">
+                    <div class="control-group half">
+                        <label for="fontSize">Size (px)</label>
+                        <input type="number" id="fontSize" value="64" min="10" max="500">
+                    </div>
+                    <div class="control-group half">
+                        <label for="textColor">Color</label>
+                        <input type="color" id="textColor" value="#ffffff">
+                    </div>
+                </div>
+
+                <div class="control-row">
+                    <div class="control-group half">
+                        <label for="bgColor">Background</label>
+                        <input type="color" id="bgColor" value="#000000">
+                    </div>
+                    <div class="control-group half">
+                        <label>Transparent</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="transparentBg">
+                            <label for="transparentBg" class="slider"></label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <button id="downloadBtn" class="primary-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download PNG
+                    </button>
+                </div>
+            </aside>
+
+            <section class="preview-panel">
+                <div class="canvas-wrapper">
+                    <canvas id="textCanvas"></canvas>
+                </div>
+                <div class="status-bar">
+                    <span id="dimensions">Waiting for input...</span>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Instruction Modal for Font -->
+    <div id="fontModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Font Setup Required</h2>
+            <p>To use <strong>Samsung Sharp Sans</strong>, please ensure you have the font definition in your CSS or the
+                font file installed on your system.
+                <br><br>
+                <i>Note: If you have the .ttf/.otf file, place it in a 'fonts' folder and uncomment the @font-face rule
+                    in style.css.</i>
+            </p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
