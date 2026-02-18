@@ -15,7 +15,8 @@ app.use(express.json());
 // Register Fonts
 const fonts = {
     'Samsung Sharp Sans': 'samsungsharpsans-medium.otf',
-    'Global Font': 'global.ttf' // Single fallback font file for all other languages
+    'Global Font': 'global.ttf', // Single fallback font file for all other languages
+    'Fredoka One': 'fredoka-one.one-regular.ttf'
 };
 
 Object.entries(fonts).forEach(([family, file]) => {

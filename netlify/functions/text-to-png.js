@@ -6,7 +6,8 @@ const fetch = require('node-fetch');
 // Register Fonts
 const fonts = {
     'Samsung Sharp Sans': 'samsungsharpsans-medium.otf',
-    'Global Font': 'global.ttf'
+    'Global Font': 'global.ttf',
+    'Fredoka One': 'fredoka-one.one-regular.ttf'
 };
 
 // Tracking font loading status for debug
